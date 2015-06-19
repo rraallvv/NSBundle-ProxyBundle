@@ -25,8 +25,14 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#import <objc/runtime.h>
 #import "NSBundle+ProxyBundle.h"
+#if TARGET_OS_IPHONE
+#	import <UIKit/UIKit.h>
+#	define NSImage	UIImage
+#else
+#	import <AppKit/AppKit.h>
+#endif
+#import <objc/runtime.h>
 
 @interface BPRProxyBundle : NSBundle
 
@@ -39,12 +45,11 @@
 static BPRProxyBundle *BPRMainBundleInstance = nil;
 static NSBundle *BPRSubstitutionBundle = nil;
 
-#if TARGET_OS_IPHONE
 static NSCache *BPRImageCache = nil;
 
-@interface BPRImage : UIImage
+@interface BPRImage : NSImage
 
-+ (UIImage *)bpr_imageNamed:(NSString *)name;
++ (NSImage *)bpr_imageNamed:(NSString *)name;
 + (void)bpr_swizzleMethods;
 
 @end
@@ -80,11 +85,14 @@ static NSCache *BPRImageCache = nil;
     if (![extension length]) {
         extension = @"png";
     }
+
+	NSString *resolvedPath = nil;
+	NSString *possibleFilename = nil;
+
+#if TARGET_OS_IPHONE
     NSString *deviceString = [[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad ? @"ipad" : @"iphone";
     int scaleInt = (int)roundf([[UIScreen mainScreen] scale]);
     
-    NSString *possibleFilename = nil;
-    NSString *resolvedPath = nil;
     if (scaleInt != 1) {
         possibleFilename = [NSString stringWithFormat:@"%1$@@%3$dx~%4$@.%2$@", baseName, extension, scaleInt, deviceString];
         resolvedPath = [BPRImage bpr_pathForFile:possibleFilename inDirectories:searchDirectories];
@@ -138,20 +146,21 @@ static NSCache *BPRImageCache = nil;
             possibleFilename = [NSString stringWithFormat:@"%1$@~%2$@", baseName, deviceString];
             resolvedPath = [BPRImage bpr_pathForFile:possibleFilename inDirectories:searchDirectories];
         }
-        
+#endif
         if (!resolvedPath) {
             possibleFilename = baseName;
             resolvedPath = [BPRImage bpr_pathForFile:possibleFilename inDirectories:searchDirectories];
         }
-        
+#if TARGET_OS_IPHONE
     }
+#endif
 
     return resolvedPath;
 }
 
-+ (UIImage *)bpr_imageNamed:(NSString *)name
++ (NSImage *)bpr_imageNamed:(NSString *)name
 {
-    UIImage *result = [BPRImageCache objectForKey:name];
+    NSImage *result = [BPRImageCache objectForKey:name];
     if (!result) {
         if (BPRSubstitutionBundle) {
             NSArray *searchDirectories = @[
@@ -162,7 +171,7 @@ static NSCache *BPRImageCache = nil;
             NSString *path = [BPRImage bpr_resolvePathForImageName:name inDirectories:searchDirectories];
             
             if (path) {
-                result = [UIImage imageWithContentsOfFile:path];
+                result = [[NSImage alloc] initWithContentsOfFile:path];
             }
         } else {
             result = [BPRImage bpr_imageNamed:name];
@@ -191,8 +200,6 @@ static NSCache *BPRImageCache = nil;
 
 @end
 
-#endif
-
 @implementation BPRProxyBundle
 {
     NSBundle *_proxiedBundle;
@@ -218,10 +225,7 @@ static NSCache *BPRImageCache = nil;
         
         method_exchangeImplementations(bprMethod, nsMethod);
         
-#if TARGET_OS_IPHONE
         [BPRImage bpr_swizzleMethods];
-#endif
-        
     });
 }
 
@@ -229,16 +233,12 @@ static NSCache *BPRImageCache = nil;
 {
     [BPRProxyBundle bpr_swizzleMethods];
     BPRSubstitutionBundle = bundle;
-#if TARGET_OS_IPHONE
     [BPRImageCache removeAllObjects];
-#endif
 }
 
 + (void)invalidateCaches
 {
-#if TARGET_OS_IPHONE
     [BPRImageCache removeAllObjects];
-#endif
 }
 
 - (id)initWithProxiedBundle:(NSBundle *)bundle
@@ -318,11 +318,9 @@ static NSCache *BPRImageCache = nil;
 
 - (NSURL *)appStoreReceiptURL
 {
-#if TARGET_OS_MAC && !(TARGET_OS_EMBEDDED || TARGET_OS_IPHONE)
     if ([_proxiedBundle respondsToSelector:@selector(appStoreReceiptURL)]) {
         return [_proxiedBundle appStoreReceiptURL];
     }
-#endif
     return nil;
 }
 
