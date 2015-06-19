@@ -65,15 +65,19 @@ static NSCache *BPRImageCache = nil;
 + (NSString *)bpr_pathForFile:(NSString *)filename inDirectories:(NSArray *)directories
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
-    NSString *result = nil;
     for (NSString *directoryPath in directories) {
-        NSString *filePath = [directoryPath stringByAppendingPathComponent:filename];
-        if ([fileManager fileExistsAtPath:filePath]) {
-            result = filePath;
-            break;
-        }
+		NSDirectoryEnumerator* enumerator = [[NSFileManager defaultManager] enumeratorAtPath:directoryPath];
+		for (NSString *file in enumerator) {
+			NSString *filePath = [directoryPath stringByAppendingPathComponent:file];
+			BOOL isDirectory = NO;
+			[fileManager fileExistsAtPath:filePath isDirectory: &isDirectory];
+			if (!isDirectory && [[filePath lastPathComponent] isEqualToString:filename])
+			{
+				return filePath;
+			}
+		}
     }
-    return result;
+	return nil;
 }
 
 // These possible filenames are based on observation of the order files [UIImage imageNamed:] looks for.
@@ -148,7 +152,7 @@ static NSCache *BPRImageCache = nil;
         }
 #endif
         if (!resolvedPath) {
-            possibleFilename = baseName;
+            possibleFilename = [NSString stringWithFormat:@"%1$@.%2$@", baseName, extension];
             resolvedPath = [BPRImage bpr_pathForFile:possibleFilename inDirectories:searchDirectories];
         }
 #if TARGET_OS_IPHONE
@@ -172,7 +176,9 @@ static NSCache *BPRImageCache = nil;
             
             if (path) {
                 result = [[NSImage alloc] initWithContentsOfFile:path];
-            }
+			} else {
+				result = [BPRImage bpr_imageNamed:name];
+			}
         } else {
             result = [BPRImage bpr_imageNamed:name];
         }
@@ -190,11 +196,11 @@ static NSCache *BPRImageCache = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         Class myClass = objc_getClass("BPRImage");
-        Class uiImageClass = objc_getClass("UIImage");
+        Class imageClass = [NSImage class];
         Method bprMethod = class_getClassMethod(myClass, @selector(bpr_imageNamed:));
-        Method uiMethod = class_getClassMethod(uiImageClass, @selector(imageNamed:));
+        Method method = class_getClassMethod(imageClass, @selector(imageNamed:));
         
-        method_exchangeImplementations(bprMethod, uiMethod);
+        method_exchangeImplementations(bprMethod, method);
     });
 }
 
