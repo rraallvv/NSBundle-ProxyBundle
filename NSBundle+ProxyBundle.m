@@ -195,7 +195,7 @@ static NSCache *BPRImageCache = nil;
 {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        Class myClass = objc_getClass("BPRImage");
+        Class myClass = [BPRImage class];
         Class imageClass = [NSImage class];
         Method bprMethod = class_getClassMethod(myClass, @selector(bpr_imageNamed:));
         Method method = class_getClassMethod(imageClass, @selector(imageNamed:));
@@ -224,8 +224,8 @@ static NSCache *BPRImageCache = nil;
 {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        Class myClass = objc_getClass("BPRBundle");
-        Class nsBundleClass = objc_getClass("NSBundle");
+        Class myClass = [BPRProxyBundle class];
+        Class nsBundleClass = [NSBundle class];
         Method bprMethod = class_getClassMethod(myClass, @selector(bpr_mainBundle));
         Method nsMethod = class_getClassMethod(nsBundleClass, @selector(mainBundle));
         
